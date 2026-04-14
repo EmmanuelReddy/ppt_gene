@@ -1,0 +1,40 @@
+# Secrets — never commit real keys (use backend/.env.example as a template)
+.env
+.env.local
+!.env.example
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+frontend/.env
+
+# Backend runtime & tooling
+backend/cache/
+backend/venv/
+backend/uploads/
+uploads/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.Python
+
+# Frontend build artifacts (also listed in frontend/.gitignore)
+node_modules/
+dist/
+dist-ssr/
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE / local tooling
+.idea/
+.vscode/
+!.vscode/extensions.json
+.cursor/
+
+# Keys / certs (if ever added)
+*.pem
+*.key

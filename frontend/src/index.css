@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root, .neon-night {
+    --bg-primary: #111116;
+    --bg-secondary: rgba(26, 26, 36, 0.85);
+    --text-primary: #FFFFFF;
+    --text-secondary: #94a3b8;
+    --border-color: rgba(255, 255, 255, 0.05);
+    --glass-bg: rgba(26, 26, 36, 0.4);
+    --glass-border: rgba(32, 178, 170, 0.2);
+
+    --brand-50: #f0fdfa;
+    --brand-100: #ccfbf1;
+    --brand-500: #20b2aa;
+    --brand-600: #008080;
+    --brand-700: #006666;
+    --brand-900: #003333;
+  }
+
+  body {
+    @apply bg-theme-primary text-theme-primary antialiased selection:bg-brand-500 selection:text-white transition-colors duration-300;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    text-wrap: balance;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-glass backdrop-blur-xl border border-glass shadow-2xl transition-colors duration-300;
+  }
+  .glass-card {
+    @apply bg-theme-secondary border border-glass shadow-[0_4px_30px_rgba(0,0,0,0.5)] rounded-2xl transition-all duration-300 backdrop-blur-3xl;
+  }
+}
