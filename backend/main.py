@@ -15,16 +15,24 @@ load_dotenv()
 
 app = FastAPI(title="AI Pitch Deck Generator (Text/Data First)")
 
+# Comma-separated origins for deployed frontend(s), e.g.
+# FRONTEND_ORIGINS=https://your-frontend.onrender.com,https://www.yourdomain.com
+raw_origins = (os.getenv("FRONTEND_ORIGINS") or "").strip()
+env_origins = [o.strip().rstrip("/") for o in raw_origins.split(",") if o.strip()]
+default_local_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+]
+allow_origins = env_origins if env_origins else default_local_origins
+
 # Configure CORS for the frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-    ],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origins=allow_origins,
+    # Keep localhost regex only for local-dev convenience when using default origins.
+    allow_origin_regex=None if env_origins else r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

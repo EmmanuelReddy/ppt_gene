@@ -1,5 +1,4 @@
-const API_HOST = window.location.hostname || 'localhost';
-const API_URL = `http://${API_HOST}:8000/api`;
+const API_URL = (import.meta.env.VITE_API_URL || '').trim() || 'http://localhost:8000/api';
 
 export async function generateContent(
   prompt,

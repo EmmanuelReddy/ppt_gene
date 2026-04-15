@@ -7,6 +7,7 @@
 .env.production.local
 backend/.env
 frontend/.env
+frontend/.env.example
 
 # Backend runtime & tooling
 backend/cache/
