@@ -306,6 +306,45 @@ const THEME_MAP = {
     cardBg: 'bg-white',
     cardHover: 'shadow-md',
   },
+
+  /** Moda-inspired: dusk canvas, magenta/violet energy, editable-canvas feel */
+  moda_canvas: darkTheme({
+    canvas: '#0f0a14',
+    svgBase: '#12081a',
+    orbSecondary: '#e879f9',
+    layoutTones: tones('#e879f9', '#a855f7', '#f472b6', '#c026d3', '#e879f9'),
+    featureGridCanvas:
+      'linear-gradient(155deg, #1a0a22 0%, #2d1b3d 42%, #0f172a 100%)',
+    power: {
+      color: '#f5d0fe',
+      webkitTextFillColor: '#f5d0fe',
+      textShadow:
+        '0 0 22px rgba(232,121,249,0.9), 0 0 52px rgba(168,85,247,0.45), 0 2px 0 #a21caf',
+    },
+    accent: '#e879f9',
+    accentRgb: '232,121,249',
+    gridRgb: '232,121,249',
+    headerPillar: 'linear-gradient(to bottom, #e879f9, #a855f7)',
+    tableHeaderBg: 'rgba(232,121,249,0.1)',
+    tableHeaderText: '#f5d0fe',
+    valueGlowRgb: '232,121,249',
+  }),
+
+  /** Bright studio / SaaS daylight — Gamma-Chronicle landing calm */
+  studio_daylight: {
+    isLight: true,
+    canvasBg: '#f8fafc',
+    featureGridCanvas: 'linear-gradient(180deg, #ffffff 0%, #f1f5f9 55%, #e0e7ff 100%)',
+    layoutTones: tones('#2563eb', '#4f46e5', '#0ea5e9', '#6366f1', '#2563eb'),
+    accent: '#2563eb',
+    accentRgb: '37,99,235',
+    titleClass: 'font-display font-bold text-slate-900',
+    bodyMuted: 'text-slate-600',
+    bodyStrong: 'text-slate-900',
+    borderSubtle: 'border-slate-200',
+    cardBg: 'bg-white',
+    cardHover: 'shadow-lg shadow-slate-200/60',
+  },
 };
 
 /** Order used when themePack === "variety" */
@@ -322,6 +361,8 @@ export const VARIETY_THEME_IDS = [
   'canva_pop',
   'chronicle_paper',
   'modal_dusk',
+  'moda_canvas',
+  'studio_daylight',
 ];
 
 export function getThemeTokens(themeId) {

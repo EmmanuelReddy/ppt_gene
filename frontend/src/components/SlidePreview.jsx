@@ -1,5 +1,5 @@
 import React from 'react';
-import { Network, Database, Zap, ArrowRightCircle, TrendingUp } from 'lucide-react';
+import { Network, Database, Zap, ArrowRightCircle, TrendingUp, Flag } from 'lucide-react';
 import { resolveSlideTheme, getSlideBackgroundImgSrc } from '../theme/slideThemes';
 
 const SlidePreview = ({
@@ -101,11 +101,19 @@ const SlideCard = ({
               className="absolute inset-0"
               style={{
                 background: light
-                  ? 'linear-gradient(135deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.45) 45%, rgba(250,250,249,0.75) 100%)'
-                  : 'linear-gradient(135deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.55) 40%, rgba(0,0,0,0.72) 100%)',
+                  ? 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.72) 45%, rgba(250,250,249,0.86) 100%)'
+                  : 'linear-gradient(135deg, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0.82) 100%)',
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-tr from-black/25 via-transparent to-white/5" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-black/35 via-transparent to-white/10" />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: light
+                  ? 'radial-gradient(ellipse 72% 54% at 50% 42%, rgba(255,255,255,0.42), rgba(255,255,255,0.08) 72%, transparent 100%)'
+                  : 'radial-gradient(ellipse 70% 52% at 50% 42%, rgba(0,0,0,0.26), rgba(0,0,0,0.1) 72%, transparent 100%)',
+              }}
+            />
           </>
         )}
         {!usePhotoBg && !useEditorialCanvas && svgBgSrc && (
@@ -171,8 +179,11 @@ const SlideCard = ({
         {layout === 'data_pivot'      && <DataPivotSlide slide={slide} tokens={tokens} />}
         {layout === 'roi_matrix'      && <ROIMatrixSlide slide={slide} tokens={tokens} />}
         {layout === 'feature_grid'    && <FeatureGridSlide slide={slide} tokens={tokens} />}
+        {layout === 'timeline_story'  && <TimelineStorySlide slide={slide} tokens={tokens} />}
+        {layout === 'spotlight_frame' && <SpotlightFrameSlide slide={slide} tokens={tokens} />}
+        {layout === 'duo_cards'       && <DuoCardsSlide slide={slide} tokens={tokens} />}
 
-        {!['disruptor', 'scaling_machine', 'data_pivot', 'roi_matrix', 'feature_grid'].includes(layout) && (
+        {!['disruptor', 'scaling_machine', 'data_pivot', 'roi_matrix', 'feature_grid', 'timeline_story', 'spotlight_frame', 'duo_cards'].includes(layout) && (
           <DisruptorSlide slide={slide} tokens={tokens} />
         )}
       </div>
@@ -711,6 +722,139 @@ const ROIMatrixSlide = ({ slide, tokens }) => {
               })}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────
+   5. TIMELINE STORY — Sequence / journey strip
+───────────────────────────────────────────────────── */
+const TimelineStorySlide = ({ slide, tokens }) => {
+  const light = tokens.isLight;
+  const rgb = tokens.accentRgb || '32,178,170';
+  const raw = Array.isArray(slide.story_steps) ? slide.story_steps : [];
+  const seed = (slide.bullets || []).slice(0, 4).map((b, i) => ({
+    label: `PHASE ${i + 1}`,
+    title: b,
+    detail: slide.main_text || 'Progress milestone',
+  }));
+  const steps = (raw.length ? raw : seed).slice(0, 5);
+
+  return (
+    <div className="relative flex min-h-0 h-full w-full flex-col p-7 sm:p-9 z-10 overflow-hidden">
+      <div className="mb-4 sm:mb-6">
+        <h2
+          className={`font-black uppercase tracking-[0.14em] leading-tight ${tokens.titleClass || 'font-display text-white'}`}
+          style={{ fontSize: 'clamp(1.4rem, 3vw, 2.7rem)' }}
+        >
+          {slide.title}
+        </h2>
+        {slide.main_text && (
+          <p className={`mt-2 text-sm sm:text-base max-w-3xl ${tokens.bodyMuted || 'text-gray-400'}`}>
+            {slide.main_text}
+          </p>
+        )}
+      </div>
+
+      <div className="relative flex-1 min-h-0">
+        <div
+          className="absolute left-[9%] right-[9%] top-5 h-[2px] pointer-events-none"
+          style={{
+            background: light
+              ? 'linear-gradient(90deg, rgba(15,23,42,0.16), rgba(15,23,42,0.36), rgba(15,23,42,0.16))'
+              : `linear-gradient(90deg, rgba(${rgb},0.18), rgba(${rgb},0.7), rgba(${rgb},0.18))`,
+          }}
+        />
+
+        <div className="grid h-full grid-cols-1 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 items-start">
+          {steps.map((step, i) => (
+            <div
+              key={`${i}-${step.title}`}
+              className={`relative rounded-2xl border p-3 sm:p-4 min-h-[8.6rem] ${
+                light ? 'border-slate-200 bg-white shadow-sm' : 'border-white/10 bg-black/25'
+              }`}
+            >
+              <div
+                className="absolute -top-2 left-4 w-4 h-4 rounded-full border-2"
+                style={{
+                  borderColor: tokens.accent,
+                  background: light ? '#ffffff' : '#0b0b0c',
+                  boxShadow: light ? '0 0 0 2px rgba(255,255,255,0.9)' : `0 0 12px rgba(${rgb},0.5)`,
+                }}
+              />
+              <div className="flex items-center gap-2 mb-2">
+                <Flag
+                  className="w-4 h-4 shrink-0"
+                  style={{ color: tokens.accent }}
+                />
+                <span className={`text-[10px] tracking-[0.18em] font-bold ${light ? 'text-slate-600' : 'text-gray-300'}`}>
+                  {step.label || `PHASE ${i + 1}`}
+                </span>
+              </div>
+              <h3 className={`font-bold text-sm sm:text-base leading-tight ${light ? 'text-slate-900' : 'text-white'}`}>
+                {step.title || `Step ${i + 1}`}
+              </h3>
+              <p className={`mt-2 text-xs sm:text-sm leading-relaxed ${light ? 'text-slate-600' : 'text-gray-400'}`}>
+                {step.detail || 'Key movement in the narrative arc.'}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SpotlightFrameSlide = ({ slide, tokens }) => {
+  const light = tokens.isLight;
+  const points = (slide.bullets || []).slice(0, 3);
+  return (
+    <div className="relative flex h-full w-full flex-col justify-center px-10 py-8 z-10">
+      <div className={`rounded-3xl border p-8 sm:p-10 ${light ? 'bg-white/95 border-slate-200 shadow-xl' : 'bg-black/35 border-white/10'}`}>
+        <h2 className={`font-black leading-tight mb-5 ${tokens.titleClass || 'font-display text-white'}`} style={{ fontSize: 'clamp(1.6rem, 3.4vw, 3.2rem)' }}>
+          {slide.title}
+        </h2>
+        {slide.main_text && (
+          <p className={`text-base sm:text-xl leading-relaxed mb-5 ${light ? 'text-slate-700' : 'text-gray-200'}`}>
+            {slide.main_text}
+          </p>
+        )}
+        {points.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {points.map((p, i) => (
+              <div key={i} className={`rounded-xl p-3 border ${light ? 'bg-slate-50 border-slate-200' : 'bg-black/25 border-white/10'}`}>
+                <span className="block text-[10px] tracking-[0.2em] font-bold mb-2" style={{ color: tokens.accent }}>
+                  NOTE {i + 1}
+                </span>
+                <p className={`text-sm leading-relaxed ${light ? 'text-slate-700' : 'text-gray-300'}`}>{p}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DuoCardsSlide = ({ slide, tokens }) => {
+  const light = tokens.isLight;
+  const shift = slide.comparison_shift || { old_way: 'Current lens', new_way: 'Next lens' };
+  return (
+    <div className="relative flex h-full w-full flex-col px-8 py-7 z-10">
+      <h2 className={`font-black tracking-[0.12em] uppercase mb-4 ${tokens.titleClass || 'font-display text-white'}`} style={{ fontSize: 'clamp(1.3rem, 2.8vw, 2.3rem)' }}>
+        {slide.title}
+      </h2>
+      {slide.main_text && <p className={`mb-5 text-sm sm:text-base ${light ? 'text-slate-600' : 'text-gray-300'}`}>{slide.main_text}</p>}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-h-0 flex-1">
+        <div className={`rounded-2xl border p-5 ${light ? 'bg-white border-slate-200 shadow-sm' : 'bg-black/25 border-white/10'}`}>
+          <span className={`text-xs tracking-[0.2em] font-bold ${light ? 'text-rose-700' : 'text-rose-300'}`}>LENS A</span>
+          <p className={`mt-3 text-base sm:text-lg leading-relaxed ${light ? 'text-slate-800' : 'text-gray-200'}`}>{shift.old_way}</p>
+        </div>
+        <div className={`rounded-2xl border p-5 ${light ? 'bg-white border-slate-200 shadow-sm' : 'bg-black/25 border-white/10'}`}>
+          <span className="text-xs tracking-[0.2em] font-bold" style={{ color: tokens.accent }}>LENS B</span>
+          <p className={`mt-3 text-base sm:text-lg leading-relaxed ${light ? 'text-slate-800' : 'text-gray-200'}`}>{shift.new_way}</p>
         </div>
       </div>
     </div>

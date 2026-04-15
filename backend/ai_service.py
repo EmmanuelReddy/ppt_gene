@@ -33,6 +33,8 @@ RANDOM_THEME_POOL = [
     "canva_pop",
     "chronicle_paper",
     "modal_dusk",
+    "moda_canvas",
+    "studio_daylight",
 ]
 
 
@@ -41,6 +43,61 @@ def resolve_theme_pack(theme_pack: str) -> str:
     if t in ("random", "auto", "shuffle"):
         return random.choice(RANDOM_THEME_POOL)
     return theme_pack
+
+
+def _is_pitch_style_mode(founder_mode: str) -> bool:
+    return founder_mode in ("fundraising", "gtm_narrative", "product_traction")
+
+
+def _get_deck_mode_config(founder_mode: str) -> tuple[str, str]:
+    """Returns (directive, slide_structure_hint) for content phase."""
+    config: Dict[str, tuple[str, str]] = {
+        "fundraising": (
+            "Optimize for investor conviction, defensibility, traction, and clear ask.",
+            "Slide flow hint: problem → insight → product → traction → market → model → competition → team → ask.",
+        ),
+        "gtm_narrative": (
+            "Optimize for go-to-market clarity: ICP, channels, conversion loops, and revenue ramp.",
+            "Slide flow hint: context → ICP → motion → channels → funnel → proof → scaling plan.",
+        ),
+        "product_traction": (
+            "Optimize for product depth, retention, usage growth, and roadmap credibility.",
+            "Slide flow hint: problem → product → users → metrics → roadmap → differentiation.",
+        ),
+        "enterprise_sales": (
+            "Optimize for buyer pain, quantified outcomes, proof, deployment path, and commercial next step.",
+            "Slide flow hint: hook → pain → outcome → solution map → proof → security/ops → ROI → next step.",
+        ),
+        "marketing_launch": (
+            "Optimize for campaign narrative, audience, message pillars, channels, and KPIs.",
+            "Slide flow hint: objective → audience insight → positioning → pillars → plan → measurement.",
+        ),
+        "product_roadmap": (
+            "Optimize for milestones, dependencies, sequencing, and delivery risk.",
+            "Slide flow hint: vision → current state → phases → milestones → owners/risks → success criteria.",
+        ),
+        "quarterly_review": (
+            "Optimize for results vs plan, KPIs, highlights, blockers, and forward outlook.",
+            "Slide flow hint: headline → KPI scorecard → wins → misses → learnings → outlook → priorities.",
+        ),
+        "research_report": (
+            "Optimize for thesis, scope, methodology, findings, evidence, and implications.",
+            "Slide flow hint: question → context → methods → findings → discussion → conclusions → next steps.",
+        ),
+        "education": (
+            "Optimize for learning objectives, conceptual scaffolding, examples, and takeaways.",
+            "Slide flow hint: outcomes → concepts → examples → recap → resources.",
+        ),
+        "brand_story": (
+            "Optimize for narrative arc, differentiation, proof, and memorable positioning beyond raw metrics.",
+            "Slide flow hint: why now → belief → proof points → craft → momentum → closing thought.",
+        ),
+    }
+    fallback = (
+        "Adapt structure to the user's topic with clear progression and concrete evidence.",
+        "Slide flow hint: open with context, build a logical arc, end with a crisp takeaway.",
+    )
+    return config.get(founder_mode, fallback)
 
 
 # -----------------------------------------------
@@ -461,12 +518,21 @@ class FeatureCardItem(BaseModel):
     )
 
 
+class StoryStepItem(BaseModel):
+    label: str = Field(description="Short stage label, e.g. Phase 1")
+    title: str = Field(description="Step headline")
+    detail: str = Field(description="One concise supporting sentence")
+
+
 class DesignedSlide(BaseModel):
     title: str
     layout_type: str = Field(
         description=(
-            "MUST be one of: 'disruptor', 'scaling_machine', 'data_pivot', 'roi_matrix', 'feature_grid'. "
+            "MUST be one of: 'disruptor', 'scaling_machine', 'data_pivot', 'roi_matrix', 'feature_grid', 'timeline_story', 'spotlight_frame', 'duo_cards'. "
             "Use 'feature_grid' for audience/persona/consumer pillars: left stat circle + 2x2 cards (Gamma/Chronicle style). "
+            "Use 'timeline_story' for roadmap/process/journey narratives with 3-5 chronological steps. "
+            "Use 'spotlight_frame' for quote-led narrative statement with concise support. "
+            "Use 'duo_cards' for two-lens contrast (e.g., challenge vs response, present vs future). "
             "CRITICAL: If the slide contains a percentage or a dollar amount over $100M, "
             "you MUST assign 'disruptor' and extract a power_number."
         )
@@ -510,6 +576,10 @@ class DesignedSlide(BaseModel):
     feature_cards: Optional[List[FeatureCardItem]] = Field(
         default=None,
         description="Exactly 4 items for feature_grid; otherwise null.",
+    )
+    story_steps: Optional[List[StoryStepItem]] = Field(
+        default=None,
+        description="For timeline_story only: 3-5 chronological steps with label/title/detail.",
     )
     pexels_search_query: Optional[str] = Field(
         default=None,
@@ -563,25 +633,48 @@ def _compose_pexels_query(slide: DesignedSlide, deck_prompt: str, slide_index: i
     return pexels_service.sanitize_search_query(topic_hint or "pitch deck business")
 
 
+def _clear_pexels_fields(slide: DesignedSlide) -> DesignedSlide:
+    return slide.model_copy(
+        update={
+            "background_image_url": None,
+            "pexels_photo_page_url": None,
+            "pexels_photographer": None,
+            "pexels_photographer_url": None,
+        }
+    )
+
+
+def _should_use_photo_background(slide: DesignedSlide) -> bool:
+    """Apply Pexels only where photography improves the slide, not dense data surfaces."""
+    lt = (slide.layout_type or "").strip().lower()
+    if lt in ("roi_matrix",):
+        return False
+    cue = " ".join(
+        [
+            slide.title or "",
+            slide.main_text or "",
+            slide.visual_seed or "",
+            slide.pexels_search_query or "",
+        ]
+    ).lower()
+    if any(tok in cue for tok in ("table", "spreadsheet", "matrix", "kpi", "financial model", "dense data")):
+        return False
+    return True
+
+
 def attach_pexels_backgrounds(slides: List[DesignedSlide], deck_prompt: str) -> List[DesignedSlide]:
     key = (os.environ.get("PEXELS_API_KEY") or "").strip()
     if not key:
         return slides
     out: List[DesignedSlide] = []
     for i, s in enumerate(slides):
+        if not _should_use_photo_background(s):
+            out.append(_clear_pexels_fields(s))
+            continue
         q = _compose_pexels_query(s, deck_prompt, i)
         data = pexels_service.fetch_background_for_slide(q, key, slide_index=i)
         if not data:
-            out.append(
-                s.model_copy(
-                    update={
-                        "background_image_url": None,
-                        "pexels_photo_page_url": None,
-                        "pexels_photographer": None,
-                        "pexels_photographer_url": None,
-                    }
-                )
-            )
+            out.append(_clear_pexels_fields(s))
             continue
         out.append(
             s.model_copy(
@@ -724,9 +817,37 @@ def _pick_layout(slide: ContentSlide) -> str:
         "platform",
         "stack",
         "module",
+        "campaign",
+        "channel",
+        "messaging",
+        "stakeholder",
+        "lesson",
+        "curriculum",
+        "learning objective",
+        "brand",
+        "value prop",
     )
     if any(t in low for t in fg_tokens):
         return "feature_grid"
+    timeline_tokens = (
+        "timeline",
+        "roadmap",
+        "journey",
+        "phase",
+        "milestone",
+        "sequence",
+        "step",
+        "implementation plan",
+        "rollout",
+    )
+    if any(t in low for t in timeline_tokens):
+        return "timeline_story"
+    duo_tokens = ("vs", "versus", "tradeoff", "compare", "option", "either", "balance", "before and after")
+    if any(t in low for t in duo_tokens):
+        return "duo_cards"
+    spotlight_tokens = ("thesis", "belief", "principle", "why now", "vision", "north star", "manifesto")
+    if any(t in low for t in spotlight_tokens):
+        return "spotlight_frame"
     if any(token in low for token in ["before", "after", "shift", "vs", "from", "to"]):
         return "data_pivot"
     if any(token in low for token in ["revenue", "margin", "ltv", "cac", "arr", "metric"]):
@@ -772,10 +893,92 @@ def _build_feature_grid_fallback(raw: ContentSlide) -> DesignedSlide:
 
 def _build_resilient_design_fallback(outline: ContentOutline) -> PresentationDeck:
     slides: List[DesignedSlide] = []
-    for raw in outline.slides:
+    layout_counts: Dict[str, int] = {}
+    prev_layout: Optional[str] = None
+    for i, raw in enumerate(outline.slides):
         layout = _pick_layout(raw)
+        if prev_layout == layout and layout_counts.get(layout, 0) >= 2:
+            if layout in ("scaling_machine", "roi_matrix"):
+                layout = "feature_grid"
+            elif layout == "feature_grid":
+                layout = "timeline_story"
+            elif layout == "data_pivot":
+                layout = "scaling_machine"
+            elif layout == "timeline_story":
+                layout = "spotlight_frame"
+            elif layout == "spotlight_frame":
+                layout = "duo_cards"
+        if i >= 4 and len({k for k, v in layout_counts.items() if v > 0}) < 2 and layout == prev_layout:
+            layout = "feature_grid" if layout != "feature_grid" else "timeline_story"
+
+        layout_counts[layout] = layout_counts.get(layout, 0) + 1
+        prev_layout = layout
         if layout == "feature_grid":
             slides.append(_build_feature_grid_fallback(raw))
+            continue
+        if layout == "timeline_story":
+            points = list(raw.points or [])
+            while len(points) < 3:
+                points.append(raw.thesis[:180] if raw.thesis else "Milestone detail")
+            steps: List[StoryStepItem] = []
+            for i, p in enumerate(points[:4]):
+                line = (p or "").strip() or f"Step {i + 1} detail"
+                if ":" in line:
+                    step_title, _, step_detail = line.partition(":")
+                    steps.append(
+                        StoryStepItem(
+                            label=f"PHASE {i + 1}",
+                            title=step_title.strip()[:48] or f"Phase {i + 1}",
+                            detail=(step_detail.strip() or line)[:200],
+                        )
+                    )
+                else:
+                    steps.append(
+                        StoryStepItem(
+                            label=f"PHASE {i + 1}",
+                            title=(line[:56] + ("…" if len(line) > 56 else "")),
+                            detail=(raw.thesis or line)[:200],
+                        )
+                    )
+            slides.append(
+                DesignedSlide(
+                    title=raw.title,
+                    layout_type="timeline_story",
+                    main_text=raw.thesis,
+                    story_steps=steps,
+                    visual_seed=f"{raw.title} roadmap journey",
+                    pexels_search_query=pexels_service.sanitize_search_query(f"{raw.title} timeline strategy"),
+                )
+            )
+            continue
+        if layout == "spotlight_frame":
+            support = list(raw.points or [])
+            while len(support) < 2:
+                support.append(raw.thesis[:180] if raw.thesis else "Supporting point")
+            slides.append(
+                DesignedSlide(
+                    title=raw.title,
+                    layout_type="spotlight_frame",
+                    main_text=raw.thesis,
+                    bullets=support[:3],
+                    visual_seed=f"{raw.title} editorial spotlight",
+                    pexels_search_query=pexels_service.sanitize_search_query(f"{raw.title} abstract editorial"),
+                )
+            )
+            continue
+        if layout == "duo_cards":
+            left = raw.points[0] if raw.points else "Current state constraints"
+            right = raw.points[1] if len(raw.points) > 1 else "Proposed strategic response"
+            slides.append(
+                DesignedSlide(
+                    title=raw.title,
+                    layout_type="duo_cards",
+                    main_text=raw.thesis,
+                    comparison_shift=ComparisonShift(old_way=left, new_way=right),
+                    visual_seed=f"{raw.title} dual perspective",
+                    pexels_search_query=pexels_service.sanitize_search_query(f"{raw.title} business contrast"),
+                )
+            )
             continue
         point_1 = raw.points[0] if raw.points else "Legacy execution"
         point_2 = raw.points[1] if len(raw.points) > 1 else "Focused execution"
@@ -833,6 +1036,7 @@ def generate_presentation_outline(
     founder_mode: str = "fundraising",
     density: str = "balanced",
     theme_pack: str = "neon_vc",
+    deck_archetype: str = "auto",
     locked_layouts: Optional[Dict[int, str]] = None,
 ) -> PresentationDeck:
     resolved_theme = resolve_theme_pack(theme_pack)
@@ -858,22 +1062,46 @@ def generate_presentation_outline(
         try:
             extracted_context = process_document(file_path, prompt)
             if extracted_context:
-                context_text = (
-                    f"\n\nSource Document Context:\n{extracted_context}\n\n"
-                    "EXTRACTION RULES:\n"
-                    "- Hunt for 'Billion-User Vision' metrics and 'Capital-Smart Growth' data.\n"
-                    "- If you find a percentage or dollar amount OVER $100M, that slide MUST use 'disruptor' layout.\n"
-                    "- Extract The Thesis (overarching philosophy, not just a summary)."
-                )
+                if _is_pitch_style_mode(founder_mode):
+                    context_text = (
+                        f"\n\nSource Document Context:\n{extracted_context}\n\n"
+                        "EXTRACTION RULES:\n"
+                        "- Hunt for vision-scale metrics and capital-efficient growth signals.\n"
+                        "- If you find a percentage or dollar amount OVER $100M, that slide MUST use 'disruptor' layout.\n"
+                        "- Extract the thesis (overarching philosophy, not just a summary)."
+                    )
+                else:
+                    context_text = (
+                        f"\n\nSource Document Context:\n{extracted_context}\n\n"
+                        "EXTRACTION RULES:\n"
+                        "- Pull facts, figures, dates, names, and structured lists relevant to the user's topic.\n"
+                        "- Prefer concrete evidence over generic marketing language.\n"
+                        "- Map extracted material to the deck profile's slide flow (not a single 'pitch' template)."
+                    )
         except Exception as e:
             print(f"[RAG WARNING] Failed to process document: {e}")
 
     # --- Phase 1: Content Mining with Cache ---
-    mode_directives = {
-        "fundraising": "Optimize for investor conviction, defensibility, traction, and clear ask.",
-        "gtm_narrative": "Optimize for go-to-market clarity: ICP, channels, conversion loops, and revenue ramp.",
-        "product_traction": "Optimize for product depth, retention, usage growth, and roadmap credibility.",
+    mode_directive, structure_hint = _get_deck_mode_config(founder_mode)
+    archetype_hints = {
+        "auto": "Let the model infer best flow from the prompt.",
+        "title_agenda_deepdive_cta": (
+            "Named flow: Title/Context -> Agenda -> 2-4 Deep Dive slides -> Proof/metrics -> CTA or next step."
+        ),
+        "problem_solution_traction_ask": (
+            "Named flow: Problem -> Existing alternatives -> Solution -> Traction -> Business model -> Ask."
+        ),
+        "story_timeline": (
+            "Named flow: Opening context -> past/current state -> 3-5 timeline phases -> destination/outcome."
+        ),
+        "report_brief": (
+            "Named flow: Executive summary -> key findings -> evidence panels -> implications -> recommendations."
+        ),
+        "workshop_lesson": (
+            "Named flow: Learning objectives -> concept modules -> worked examples -> recap -> action items."
+        ),
     }
+    archetype_hint = archetype_hints.get(deck_archetype, archetype_hints["auto"])
     density_directives = {
         "concise": "Use short, punchy lines. Max 2-3 bullets per slide and compact thesis.",
         "balanced": "Use 3 bullets and medium-length thesis statements.",
@@ -885,14 +1113,21 @@ def generate_presentation_outline(
         "detailed": "Produce 12–15 slides total.",
     }
     topic_snippet = (prompt or "").strip()[:800]
+    deck_kind = (
+        "Create a data-centric pitch deck"
+        if _is_pitch_style_mode(founder_mode)
+        else "Create a professional, presentation-ready deck"
+    )
     content_prompt = (
         f"USER TOPIC (single source of truth — stay on this subject; do not invent a different industry, product, or geography):\n"
         f"{topic_snippet}\n\n"
         f"{slide_count_guide.get(density, slide_count_guide['balanced'])}\n"
         f"The deck title MUST explicitly reflect this topic (reuse the user's domain keywords where natural).\n"
         f"Every slide title, thesis, and bullet must directly support this topic — no generic filler from unrelated domains.\n\n"
-        f"Create a data-centric pitch deck for the topic above.\n"
-        f"Founder mode: {founder_mode}. {mode_directives.get(founder_mode, mode_directives['fundraising'])}\n"
+        f"{deck_kind} for the topic above.\n"
+        f"Deck profile: {founder_mode}. {mode_directive}\n"
+        f"Named slide archetype: {deck_archetype}. {archetype_hint}\n"
+        f"{structure_hint}\n"
         f"Density: {density}. {density_directives.get(density, density_directives['balanced'])}"
         f"{context_text}"
     )
@@ -907,15 +1142,21 @@ def generate_presentation_outline(
             print("[PERF] content phase: disk cache hit (skipping Gemini)")
     else:
         t0 = time.perf_counter()
+        content_voice = (
+            "You are an expert pitch and GTM analyst. Extract strong thesis statements, metrics where possible, "
+            "and capital-smart growth angles when relevant."
+            if _is_pitch_style_mode(founder_mode)
+            else "You are an expert business presentation strategist. Prioritize clarity, evidence, and audience-appropriate "
+            "framing. Avoid VC-only jargon unless the topic is fundraising or venture-related."
+        )
         raw_json = _call_with_rotation(
             prompt=content_prompt,
             schema=ContentOutline,
             system_instruction=(
-                "You are an expert pitch analyst. "
+                f"{content_voice} "
                 "TOPIC FIDELITY: The user topic block in the prompt is the only source of truth. "
                 "Do not substitute unrelated industries (e.g. legal tech if the user asked for climate finance). "
                 "Use concrete, topic-specific language; avoid generic template examples. "
-                "Extract strong thesis statements, metrics where possible, and capital-smart growth angles. "
                 "Do NOT write fluff. Every point must carry data or conviction tied to the user's topic."
             ),
             role="content",
@@ -967,12 +1208,24 @@ def generate_presentation_outline(
         "modal_dusk": (
             "Modal.app-style: deep dusk purple/slate, soft gradients, crisp white type, lilac highlights."
         ),
+        "moda_canvas": (
+            "Moda-inspired canvas: bold dusk-to-violet gradients, high-contrast type, playful but premium accents; "
+            "feels like an editable design surface (social + slides)."
+        ),
+        "studio_daylight": (
+            "Bright studio daylight: airy off-white canvas, cool blue/indigo accents, generous whitespace, "
+            "editorial SaaS polish (Gamma/Chronicle landing-page calm)."
+        ),
     }
 
     design_prompt = f"""
-    You are the Senior Layout Architect for pitch decks.
+    You are the Senior Layout Architect for presentation decks (investor, sales, marketing, education, and more).
     Map each slide to the most impactful UI layout. All copy must match the outline (no new domains or products).
+    Deck profile: {founder_mode} — favor layouts that fit this profile (e.g. sales: proof + ROI; education: clarity + progression).
+    Named slide archetype: {deck_archetype}. {archetype_hint}
     Theme pack: {resolved_theme}. {theme_rules.get(resolved_theme, theme_rules['neon_vc'])}
+    Style direction: prioritize Chronicle-like editorial clarity, visual hierarchy, and graphic storytelling.
+    Avoid forcing Anthill/Billion-Impact motifs unless theme_pack is explicitly 'anthill_reference'.
 
     EMOJI POLICY: Do NOT use slide-level decorative emoji. Leave `emoji_char` null.
     For `feature_grid` only, you may set `emoji` on individual `feature_cards` items (or `circle_emoji`)
@@ -988,8 +1241,15 @@ def generate_presentation_outline(
        `circle_stat` (short badge e.g. 4 PILLARS or a metric), `circle_label` (bold line under stat), `circle_footer` (one-line caption),
        optional `circle_emoji`, and exactly four `feature_cards` with non-empty title AND body each.
        `pexels_search_query` must match this slide's subject (e.g. abstract AI for an AI slide, not legal imagery unless the slide is about law).
-    6. For every slide, add `visual_seed` in 2-6 words for dramatic founder-grade visual texture.
-    7. For every slide, set `pexels_search_query`: a short English phrase (2-8 words) that would find a matching stock photo on Pexels
+    6. 'timeline_story' → Use for journey, roadmap, rollout, milestones, process sequence.
+       REQUIRED: `story_steps` with 3-5 items in chronological order; each step has `label`, `title`, `detail`.
+    7. 'spotlight_frame' → Use for thesis/vision/quote-led moments. REQUIRED: `main_text` plus 2-3 concise `bullets`.
+    8. 'duo_cards' → Use for two-lens contrast. REQUIRED: fill `comparison_shift` as left vs right narrative.
+    9. Layout diversity rule: avoid repetitive runs. Do not use the same `layout_type` for more than 2 consecutive slides.
+       Across decks with 8+ slides, use at least 4 distinct layout types.
+    10. Readability rule: text must remain clearly readable over backgrounds. Prefer high contrast and restrained overlays.
+    11. For every slide, add `visual_seed` in 2-6 words for dramatic founder-grade visual texture.
+    12. For every slide, set `pexels_search_query`: a short English phrase (2-8 words) that would find a matching stock photo on Pexels
        (abstract mood + scene, e.g. "dark abstract data visualization", "business team collaboration office").
        Align it with the slide thesis and theme pack. Avoid obscure proper nouns and brand names.
        Do NOT set `background_image_url` or other Pexels URL fields (server fills those).
@@ -1012,8 +1272,13 @@ def generate_presentation_outline(
                 schema=PresentationDeck,
                 system_instruction=(
                     "Map content to layout schemas. Fill all layout-specific fields precisely. "
+                    "Favor Chronicle-like editorial visual direction and clear contrast for readability. "
                     "Never use decorative emojis; feature_grid card emoji only when it adds meaning. "
                     "For feature_grid always fill circle_stat, circle_label, circle_footer, and four complete feature_cards. "
+                    "For timeline_story always produce 3-5 ordered story_steps with label/title/detail. "
+                    "For spotlight_frame always provide main_text and 2-3 bullets. "
+                    "For duo_cards always provide comparison_shift with a crisp left-right contrast. "
+                    "Keep layout variety across slides; avoid repetitive structure loops. "
                     "Always set pexels_search_query per slide for imagery aligned to that slide's topic; never invent image URLs."
                 ),
                 role="design",
@@ -1066,7 +1331,7 @@ def regenerate_slide(
         "You may choose a better layout_type if needed."
     )
     regenerate_prompt = f"""
-    Rebuild only one founder-grade pitch slide for this prompt:
+    Rebuild only one high-quality presentation slide for this prompt:
     {prompt}
 
     Slide title: {target.title}
@@ -1075,6 +1340,7 @@ def regenerate_slide(
     Density: {density}
     Theme pack: {theme_pack}
     Rule: {locked_instruction}
+    Visual direction: Chronicle-like clarity, graphic storytelling, and strong text contrast.
     Set `pexels_search_query` (2-8 words) for a matching stock photo mood; do not set image URLs.
     """
     slide_json = _call_with_rotation(

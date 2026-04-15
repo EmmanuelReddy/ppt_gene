@@ -1,9 +1,16 @@
-const API_URL = 'http://localhost:8000/api';
+const API_HOST = window.location.hostname || 'localhost';
+const API_URL = `http://${API_HOST}:8000/api`;
 
 export async function generateContent(
   prompt,
   file = null,
-  options = { founderMode: 'fundraising', density: 'balanced', themePack: 'neon_vc', lockedLayouts: {} },
+  options = {
+    founderMode: 'fundraising',
+    density: 'balanced',
+    themePack: 'neon_vc',
+    deckArchetype: 'auto',
+    lockedLayouts: {},
+  },
 ) {
   let body, headers;
   
@@ -12,6 +19,7 @@ export async function generateContent(
   formData.append('founder_mode', options.founderMode || 'fundraising');
   formData.append('density', options.density || 'balanced');
   formData.append('theme_pack', options.themePack || 'random');
+  formData.append('deck_archetype', options.deckArchetype || 'auto');
   formData.append('locked_layouts', JSON.stringify(options.lockedLayouts || {}));
   if (file) {
     formData.append('file', file);

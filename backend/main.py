@@ -18,10 +18,17 @@ app = FastAPI(title="AI Pitch Deck Generator (Text/Data First)")
 # Configure CORS for the frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition", "Content-Length"],
 )
 
 @app.post("/api/generate-content")
@@ -30,6 +37,7 @@ async def generate_content(
     founder_mode: str = Form("fundraising"),
     density: str = Form("balanced"),
     theme_pack: str = Form("random"),
+    deck_archetype: str = Form("auto"),
     locked_layouts: str = Form(""),
     file: UploadFile = File(None)
 ):
@@ -59,6 +67,7 @@ async def generate_content(
             founder_mode=founder_mode,
             density=density,
             theme_pack=theme_pack,
+            deck_archetype=deck_archetype,
             locked_layouts=parsed_locked_layouts,
         )
         
